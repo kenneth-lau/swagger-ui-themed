@@ -1,847 +1,1064 @@
+---
 swagger: '2.0'
+
+################################################################################
+#                              API Information                                 #
+################################################################################
 info:
-  title: Maps4News API
-  version: '0.1'
-host: api.maps4news.com
-# HTTPS is enforced
+  version: v1
+  title: Instagram API
+  description: |
+    The first version of the Instagram API is an exciting step forward towards
+    making it easier for users to have open access to their data. We created it
+    so that you can surface the amazing content Instagram users share every
+    second, in fun and innovative ways.
+
+    Build something great!
+
+    Once you've
+    [registered your client](http://instagram.com/developer/register/) it's easy
+    to start requesting data from Instagram.
+
+    All endpoints are only accessible via https and are located at
+    `api.instagram.com`. For instance: you can grab the most popular photos at
+    the moment by accessing the following URL with your client ID
+    (replace CLIENT-ID with your own):
+    ```
+      https://api.instagram.com/v1/media/popular?client_id=CLIENT-ID
+    ```
+    You're best off using an access_token for the authenticated user for each
+    endpoint, though many endpoints don't require it.
+    In some cases an access_token will give you more access to information, and
+    in all cases, it means that you are operating under a per-access_token limit
+    vs. the same limit for your single client_id.
+
+
+    ## Limits
+    Be nice. If you're sending too many requests too quickly, we'll send back a
+    `503` error code (server unavailable).
+    You are limited to 5000 requests per hour per `access_token` or `client_id`
+    overall. Practically, this means you should (when possible) authenticate
+    users so that limits are well outside the reach of a given user.
+
+    ## Deleting Objects
+    We do our best to have all our URLs be
+    [RESTful](http://en.wikipedia.org/wiki/Representational_state_transfer).
+    Every endpoint (URL) may support one of four different http verbs. GET
+    requests fetch information about an object, POST requests create objects,
+    PUT requests update objects, and finally DELETE requests will delete
+    objects.
+
+    Since many old browsers don't support PUT or DELETE, we've made it easy to
+    fake PUTs and DELETEs. All you have to do is do a POST with _method=PUT or
+    _method=DELETE as a parameter and we will treat it as if you used PUT or
+    DELETE respectively.
+
+    ## Structure
+
+    ### The Envelope
+    Every response is contained by an envelope. That is, each response has a
+    predictable set of keys with which you can expect to interact:
+    ```json
+    {
+        "meta": {
+            "code": 200
+        },
+        "data": {
+            ...
+        },
+        "pagination": {
+            "next_url": "...",
+            "next_max_id": "13872296"
+        }
+    }
+    ```
+
+    #### META
+    The meta key is used to communicate extra information about the response to
+    the developer. If all goes well, you'll only ever see a code key with value
+    200. However, sometimes things go wrong, and in that case you might see a
+    response like:
+    ```json
+    {
+        "meta": {
+            "error_type": "OAuthException",
+            "code": 400,
+            "error_message": "..."
+        }
+    }
+    ```
+
+    #### DATA
+    The data key is the meat of the response. It may be a list or dictionary,
+    but either way this is where you'll find the data you requested.
+    #### PAGINATION
+    Sometimes you just can't get enough. For this reason, we've provided a
+    convenient way to access more data in any request for sequential data.
+    Simply call the url in the next_url parameter and we'll respond with the
+    next set of data.
+    ```json
+    {
+        ...
+        "pagination": {
+            "next_url": "https://api.instagram.com/v1/tags/puppy/media/recent?access_token=fb2e77d.47a0479900504cb3ab4a1f626d174d2d&max_id=13872296",
+            "next_max_id": "13872296"
+        }
+    }
+    ```
+    On views where pagination is present, we also support the "count" parameter.
+    Simply set this to the number of items you'd like to receive. Note that the
+    default values should be fine for most applications - but if you decide to
+    increase this number there is a maximum value defined on each endpoint.
+
+    ### JSONP
+    If you're writing an AJAX application, and you'd like to wrap our response
+    with a callback, all you have to do is specify a callback parameter with
+    any API call:
+    ```
+    https://api.instagram.com/v1/tags/coffee/media/recent?access_token=fb2e77d.47a0479900504cb3ab4a1f626d174d2d&callback=callbackFunction
+    ```
+    Would respond with:
+    ```js
+    callbackFunction({
+        ...
+    });
+    ```
+  termsOfService: http://instagram.com/about/legal/terms/api
+
+################################################################################
+#                  Host, Base Path, Schemes and Content Types                  #
+################################################################################
+host: api.instagram.com
+basePath: /v1
 schemes:
   - https
-
-basePath: /v1
-
 produces:
   - application/json
+consumes:
+  - application/json
 
-paths:
-  /login:
-    post:
-      description: |
-        This endpoint allows the user to authenticate and obtain an api key.
-      parameters:
-        - name: email
-          in: query
-          description: The user's email
-          required: true
-          type: string
-          format: email
-        - name: password
-          in: query
-          description: The user's password
-          required: true
-          type: string
-          format: password
-      tags:
-        - User
-        - Authentication
-      responses:
-        200:
-          description: Api Token
-          schema:
-            $ref: '#/definitions/Token'
-        400:
-          description: Bad request
-          schema:
-            $ref: '#/definitions/Error'
-        401:
-          description: Invalid or missing api token
-          schema:
-            $ref: '#/definitions/Error'
-
-  /users:
-    get:
-      description: |
-        Get all users you have acess to.
-
-        - Organisation admins will get all users in their organisation.
-
-        - Normal users will only get their own user object.
-      tags:
-        - User
-      security:
-        - api_key: [ ]
-      responses:
-        200:
-          description: Array of user objects.
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/User'
-        401:
-          description: Invalid or missing api token.
-          schema:
-            $ref: '#/definitions/Error'
-
-  /users/{id}:
-    get:
-      description: Used to get a user that you have access to.
-      tags:
-        - User
-      security:
-        - api_key: []
-      parameters:
-        - $ref: '#/parameters/id'
-      responses:
-        200:
-          description: User object.
-          schema:
-            $ref: '#/definitions/User'
-        401:
-          description: Invalid or missing api token.
-          schema:
-            $ref: '#/definitions/Error'
-
-  /users/me:
-    get:
-      description: |
-        Alias of `/users/{id}`. (All subroutes are compatible. e.g. `/users/me/svgs`)
-
-        Get the current users's object
-      tags:
-        - User
-      security:
-        - api_key: []
-      responses:
-        200:
-          description: Array of svg objects.
-          schema:
-            $ref: '#/definitions/User'
-        401:
-          description: Invalid or missing api token.
-          schema:
-            $ref: '#/definitions/Error'
-
-  /users/{id}/dimensions:
-    get:
-      description: Get all the dimensions the user has access to.
-      tags:
-        - User
-        - Dimension
-      security:
-        - api_key: []
-      parameters:
-        - $ref: '#/parameters/id'
-        - $ref: '#/parameters/page'
-        - $ref: '#/parameters/per_page'
-        - $ref: '#/parameters/X-Page'
-        - $ref: '#/parameters/X-Per-Page'
-      responses:
-        200:
-          description: Array of dimension objects.
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Dimension'
-        401:
-          description: Invalid or missing api token.
-          schema:
-            $ref: '#/definitions/Error'
-
-
-  # /users/{id}/features:
-
-  # /users/{id}/fonts:
-
-  # /users/{id}/jobs:
-
-  # For=visibility
-  # /users/{id}/shares:
-
-  /users/{id}/svgs:
-    get:
-      description: Get all the svgs the user has access to.
-      tags:
-        - User
-        - Svg
-      security:
-        - api_key: []
-      parameters:
-        - $ref: '#/parameters/id'
-        - $ref: '#/parameters/page'
-        - $ref: '#/parameters/per_page'
-        - $ref: '#/parameters/X-Page'
-        - $ref: '#/parameters/X-Per-Page'
-      responses:
-        200:
-          description: Array of svg objects.
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Svg'
-        401:
-          description: Invalid or missing api token.
-          schema:
-            $ref: '#/definitions/Error'
-
-  # /users/{id}/vector_layers:
-
-parameters:
-  id:
-    name: id
-    in: path
-    description: The ID of the resource.
-    required: true
-    type: integer
-  page:
-    name: page
-    in: query
+################################################################################
+#                                   Tags                                       #
+################################################################################
+tags:
+  - name: Users
+  - name: Relationships
     description: |
-      The page you want to visit.
+      Relationships are expressed using the following terms:
 
-      - Default: 1
-    required: false
-    type: integer
-  per_page:
-    name: per_page
-    in: query
+      **outgoing_status**: Your relationship to the user. Can be "follows",
+        "requested", "none".
+      **incoming_status**: A user's relationship to you. Can be "followed_by",
+        "requested_by", "blocked_by_you", "none".
+  - name: Media
     description: |
-      The number of resources on one page
+      At this time, uploading via the API is not possible. We made a conscious
+      choice not to add this for the following reasons:
 
-      - Default: 12
+      * Instagram is about your life on the go – we hope to encourage photos
+        from within the app.
+      * We want to fight spam & low quality photos. Once we allow uploading
+        from other sources, it's harder to control what comes into the Instagram
+        ecosystem. All this being said, we're working on ways to ensure users
+        have a consistent and high-quality experience on our platform.
+  - name: Commnts
+  - name: Likes
+  - name: Tags
+  - name: Location
+  - name: Subscribtions
 
-      - Minimum: 1
-
-      - Maximum: 50
-    type: integer
-    required: false
-
-  X-Per-Page:
-    name: X-Per-Page
-    in: header
-    description: Same as `per_page`
-    type: integer
-    required: false
-
-  X-Page:
-    name: X-Page
-    in: header
-    type: integer
-    description: Same as `page`
-    required: false
-
+################################################################################
+#                                  Security                                    #
+################################################################################
 securityDefinitions:
-  api_key:
+  oauth:
+    type: oauth2
+    flow: implicit
+    authorizationUrl: https://instagram.com/oauth/authorize/?client_id=CLIENT-ID&redirect_uri=REDIRECT-URI&response_type=token
+    scopes:
+      basic: |
+       to read any and all data related to a user (e.g. following/followed-by
+        lists, photos, etc.) (granted by default)
+      comments: to create or delete comments on a user’s behalf
+      relationships: to follow and unfollow users on a user’s behalf
+      likes: to like and unlike items on a user’s behalf
+  key:
     type: apiKey
-    name: X-Api-Token
-    description: The api token
-    in: header
+    in: query
+    name: access_token
+security:
+  - oauth:
+    - basic
+    - comments
+    - relationships
+    - likes
+  - key: []
 
-definitions:
-  timestamp:
+################################################################################
+#                                   Parameters                                 #
+################################################################################
+parameters:
+  user-id:
+    name: user-id
+    in: path
+    description: The user identifier number
+    type: number
+    required: true
+  tag-name:
+    name: tag-name
+    in: path
+    description: Tag name
     type: string
-    format: DateTime
-    description: ISO 8601/RFC3339 formatted DateTime
-    example: 2016-03-17T16:35:01Z
+    required: true
 
-  Token:
-    type: object
-    properties:
-      token:
-        type: string
-        description: Unique user token used for identification
-        example: Pjde6XYkfOhRErZaFn0ibNVbXGP4CE8UcUpMDBg4
+################################################################################
+#                                           Paths                              #
+################################################################################
+paths:
+  /users/{user-id}:
+    parameters:
+      - $ref: '#/parameters/user-id'
+    get:
+      security:
+        - key: []
+        - oauth:
+          - basic
+      tags:
+        - Users
+      description: Get basic information about a user.
+      responses:
+        200:
+          description: The user object
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/definitions/User'
 
-  Error:
-    type: object
-    properties:
-      error:
-        type: string
-        description: Error message
-        example: An error occoured
+  /users/self/feed:
+    get:
+      tags:
+        - Users
+      description: See the authenticated user's feed.
+      parameters:
+        - name: count
+          in: query
+          description: Count of media to return.
+          type: integer
+        - name: max_id
+          in: query
+          description: Return media earlier than this max_id.s
+          type: integer
+        - name: min_id
+          in: query
+          description: Return media later than this min_id.
 
-  #############
-  #           #
-  #   Models  #
-  #           #
-  #############
+          type: integer
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Media'
 
-  Contract:
-    type: object
-    properties:
-      name:
-        type: string
-        example: string
-      organisation:
-        $ref: '#/definitions/Organisation'
-      credits:
-        type: integer
-        description: >-
-          The amount of credits that this contract adds to the
-          organisation. If the value is 0 then the contract is
-          a flatrate contract.
-        example: 100
-      credit_period:
-        type: integer
-        description: >-
-          The number of credits that can be
-          used within a certain period.
-      period_length:
-        type: integer
-        description: The lenght of a period, in days.
-      date_start:
-        $ref: '#/definitions/timestamp'
-      date_end:
-        $ref: '#/definitions/timestamp'
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /users/{user-id}/media/recent:
+    parameters:
+      - $ref: '#/parameters/user-id'
+    get:
+      tags:
+        - Users
+      responses:
+        200:
+          description: |
+            Get the most recent media published by a user. To get the most recent
+            media published by the owner of the access token, you can use `self`
+            instead of the `user-id`.
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Media'
+      parameters:
+        - name: count
+          in: query
+          description: Count of media to return.
+          type: integer
+        - name: max_timestamp
+          in: query
+          description: Return media before this UNIX timestamp.
+          type: integer
+        - name: min_timestamp
+          in: query
+          description: Return media after this UNIX timestamp.
+          type: integer
+        - name: min_id
+          in: query
+          description: Return media later than this min_id.
+          type: string
+        - name: max_id
+          in: query
+          description: Return media earlier than this max_id.
+          type: string
 
-  Dimension:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 47
-      dimension_set_id:
-        type: integer
-        example: 1
-      name:
-        type: string
-        example: A5 landscape
-      width:
-        type: number
-        format: float
-      height:
-        type: number
-        format: float
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /users/self/media/liked:
+    get:
+      tags:
+        - Users
+      description: |
+        See the list of media liked by the authenticated user.
+        Private media is returned as long as the authenticated user
+        has permissionto view that media. Liked media lists are only
+        available for the currently authenticated user.
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Media'
+      parameters:
+        - name: count
+          in: query
+          description: Count of media to return.
+          type: integer
+        - name: max_like_id
+          in: query
+          description: Return media liked before this id.
+          type: integer
 
-  DimensionSet:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      name:
-        type: string
-        example: Standard
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
-      dimensions:
-        type: array
-        items:
-          $ref: '#/definitions/Dimension'
+  /users/search:
+    get:
+      tags:
+        - Users
+      description: Search for a user by name.
+      parameters:
+        - name: q
+          in: query
+          description: A query string
+          type: string
+          required: true
+        - name: count
+          in: query
+          description: Number of users to return.
+          type: string
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/MiniProfile'
 
-  Faq:
-    type: object
-    properties:
-      id:
-        type: integer
-        description: Identifier
-        example: 1
-      title:
-        type: string
-        description: Question
-        example: Frequently asked question
-      description:
-        type: string
-        description: Answer
-        example: Unescaped HTML formatted answer
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /users/{user-id}/follows:
+    parameters:
+      - $ref: '#/parameters/user-id'
+    get:
+      tags:
+        - Relationships
+      description: Get the list of users this user follows.
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/MiniProfile'
 
-  Feature:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 4
-      name:
-        type: string
-        example: Web
-      description:
-        type: string
-        example: Allows web output
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /users/{user-id}/followed-by:
+    parameters:
+      - $ref: '#/parameters/user-id'
+    get:
+      tags:
+        - Relationships
+      description: Get the list of users this user is followed by.
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/MiniProfile'
 
-  Font:
-    type: object
-    properties:
-      name:
-        type: string
-        example: Helvetica-Condensed-Bold
-      style:
-        type: string
-        enum:
-          - normal
-          - italic
-          - oblique
-          - bold
-          - thin
-        example: normal
-      weight:
-        type: integer
-        minimum: 0
-        example: 700
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /users/self/requested-by:
+    get:
+      tags:
+        - Relationships
+      description: |
+        List the users who have requested this user's permission to follow.
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: integer
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/MiniProfile'
 
-  FontFamily:
-    type: object
-    properties:
-      name:
-        type: string
-        example: Helvetica Condensed
-      fonts:
-        type: array
-        items:
-          $ref: '#/definitions/Font'
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
-      fonts:
-        type: array
-        items:
-          $ref: '#/definitions/Font'
+  /users/{user-id}/relationship:
+    parameters:
+      - $ref: '#/parameters/user-id'
+    post:
+      tags:
+        - Relationships
+      description: |
+        Modify the relationship between the current user and thetarget user.
+      security:
+        - oauth:
+          - relationships
+      parameters:
+        - name: action
+          in: body
+          description: One of follow/unfollow/block/unblock/approve/ignore.
+          schema:
+            type: string
+            enum:
+              - follow
+              - unfollow
+              - block
+              - unblock
+              - approve
 
-  IP:
-    type: object
-    properties:
-      user_id:
-        type: integer
-        example: 1
-      ip_address:
-        type: string
-        description: IPv4 or IPv6 address
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/MiniProfile'
 
-  Job:
-    type: object
-    properties:
-      id:
+  /media/{media-id}:
+    parameters:
+      - name: media-id
+        in: path
+        description: The media ID
         type: integer
-        example: 1
-      user_id:
-        type: integer
-        example: 1
-      mapstyle_set:
-        $ref: '#/definitions/MapstyleSet'
-      title:
-        type: string
-        description: Title for the job
-      description:
-        type: string
-        description: Description of the job
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+        required: true
+    get:
+      tags:
+        - Media
+      description: |
+        Get information about a media object.
+        The returned type key will allow you to differentiate between `image`
+        and `video` media.
 
-  JobResult:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      # job_id:
-      #   type: integer
-      #   example: 1
-      job:
-        $ref: '#/definitions/Job'
-      # job_revision_id:
-      #   type: integer
-      #   example: 1
-      job_revision:
-        $ref: '#/definitions/JobRevision'
-      # mapstyle_id:
-      #   type: integer
-      #   example: 1
-      mapstyle:
-        $ref: '#/definitions/Mapstyle'
-      status:
-        type: integer
-        example: 1
-        # TODO description
-      software_version:
-        type: integer
-        format: double
-        example: 1.0
-        description: The version of the backend that was used
-      interface_version:
-        type: string
-        example: '2.6.0b'
-        description: The version of the frontend that was used
-      fix:
-        type: boolean
-        example: true
-        # TODO description
-      process_start:
-        $ref: '#/definitions/timestamp'
-      process_end:
-        $ref: '#/definitions/timestamp'
-      dealt_with:
-        type: boolean
-        example: true
-        description: If the issue has been resolved
-      log: # TODO remove
-        type: string
-        description: The  log from the render job
-      preview_path: # TODO remove
-        type: string
-      file_path: # TODO remove
-        type: string
-      bought:
-        type: boolean
-        example: true
-        description: If the user paid for the map with a credit
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+        Note: if you authenticate with an OAuth Token, you will receive the
+        `user_has_liked` key which quickly tells you whether the current user
+        has liked this media item.
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/Media'
 
-  JobRevision:
-    type: object
-    properties:
-      job_id:
-        type: integer
-        example: 1
-      revision:
-        type: integer
-        example: 1
-      object:
+  /media1/{shortcode}: #FIXME: correct path is /media/{shortcode}
+    parameters:
+      - name: shortcode
+        in: path
+        description: The media shortcode
         type: string
-        format: json
-      screenshot_url:
-        type: string
-        example: http://url.to/image.png
-      archived:
-        type: boolean
-        description: If the revision was used in a render job
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+        required: true
+    get:
+      tags:
+        - Media
+      description: |
+        This endpoint returns the same response as **GET** `/media/media-id`.
 
-  JobShare:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      # job_id:
-      #   type: integer
-      #   example: 1
-      job:
-        $ref: '#/definitions/Job'
-      visibility:
-        type: string
-        enum:
-            - private
-            - organisation
-            - public
-        description: Who can view the jobshare.
-      hashkey:
-        type: integer
-        example: 1769919554
-        # TODO description
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+        A media object's shortcode can be found in its shortlink URL.
+        An example shortlink is `http://instagram.com/p/D/`
+        Its corresponding shortcode is D.
 
-  Language:
-    type: object
-    properties:
-      name:
-        type: string
-        example: English
-      code:
-        type: string
-        description: 3 character language code
-        example: eng
-      locale:
-        type: string
-        example: en_GB
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/Media'
 
-  Mapstyle:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      mapstyle_set_id:
-        type: integer
-        example: 1
-      name:
-        type: string
-        example: NEWS10k.xml
-      preview_image:
-        type: string
-        description: url to the mapstyle preview image
-      scale_min:
-        minimum: 0
-        example: 0
-        description: The lowest scale that the Mapstyle can be used at. Must be smaller than scale_min
-      scale_max:
-        minimum: 1
-        example: 16249
-        description: The highest scale that the Mapstyle can be used at. Must be greater than scale_min
-      description:
-        type: string
-        example: 1:10.000
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /media/search:
+    get:
+      tags:
+        - Media
+      description: |
+        Search for media in a given area. The default time span is set to 5
+        days. The time span must not exceed 7 days. Defaults time stamps cover
+        the last 5 days. Can return mix of image and video types.
 
-  MapstyleSet:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      name:
-        type: string
-        example: Clear News
-      description:
-        type: string
-        example: A clean and simplified bright map style.
-      version:
-        type: number
-        format: double
-        example: 2.0
-      supports_svg:
-        type: boolean
-        description: Indicates if the MapstyleSet supports SVG output
-        example: false
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
-      mapstyles:
-        type: array
-        items:
-          $ref: '#/definitions/Mapstyle'
+      parameters:
+        - name: LAT
+          description: |
+            Latitude of the center search coordinate. If used, lng is required.
+          type: number
+          in: query
+        - name: MIN_TIMESTAMP
+          description: |
+            A unix timestamp. All media returned will be taken later than
+            this timestamp.
+          type: integer
+          in: query
+        - name: LNG
+          description: |
+            Longitude of the center search coordinate. If used, lat is required.
+          type: number
+          in: query
+        - name: MAX_TIMESTAMP
+          description: |
+            A unix timestamp. All media returned will be taken earlier than this
+            timestamp.
+          type: integer
+          in: query
+        - name: DISTANCE
+          description:  Default is 1km (distance=1000), max distance is 5km.
+          type: integer
+          maximum: 5000
+          default: 1000
+          in: query
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            description: List of all media with added `distance` property
+            properties:
+              data:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/definitions/Media'
+                    -
+                      properties:
+                        distance:
+                          type: number
 
-  Notification:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      title:
-        type: string
-        example: Maps4News Maintenance message
-      description:
-        type: string
-        example: 'Maps4News Maintenance Message: Maintenance is scheduled for Tuesday, 13 October 2015, between 05:00 AM and 05:30 AM GMT. {...}'
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /media/popular:
+    get:
+      tags:
+        - Media
+      description: |
+        Get a list of what media is most popular at the moment.
+        Can return mix of image and video types.
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Media'
 
-  Organisation:
-    type: object
-    properties:
-      id:
+  /media/{media-id}/comments:
+    parameters:
+      - name: media-id
+        in: path
+        description: Media ID
         type: integer
-        example: 1
-      name:
-        type: string
-        example: ACME Inc Editors
-      company:
-        type: string
-        example: ACME Inc
-      city:
-        type: string
-        example: New York City
-      country:
-        type: string
-        example: United States
-      address:
-        type: string
-        example: 14 North Moore Street
-      credits:
-        type: integer
-        description: Availible credits
-        example: 27
-      sales_representative:
-        $ref: '#/definitions/User'
-      manager:
-        $ref: '#/definitions/User'
-      fonts:
-        type: array
-        items:
-          $ref: '#/definitions/Font'
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
-      users:
-        type: array
-        items:
-          $ref: '#/definitions/User'
+        required: true
+    get:
+      tags:
+        - Comments
+      description: |
+        Get a list of recent comments on a media object.
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: number
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Comment'
+    post:
+      tags:
+        - Comments
+        - Media
+      description: |
+        Create a comment on a media object with the following rules:
 
-  SingleSignOn:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      # user_id:
-      #   type: integer
-      #   example: 1
-      user:
-        $ref: '#/definitions/User'
-      sso_id:
-        type: integer
-        example: 1
-        # TODO description
-      type:
-        type: string
-        example: 'accounts.google.com'
-        description: The sso service
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+        * The total length of the comment cannot exceed 300 characters.
+        * The comment cannot contain more than 4 hashtags.
+        * The comment cannot contain more than 1 URL.
+        * The comment cannot consist of all capital letters.
+      security:
+        - oauth:
+            - comments
+      parameters:
+        - name: TEXT
+          description: |
+            Text to post as a comment on the media object as specified in
+            media-id.
+          in: body
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: number
+              data:
+                type: object
+    delete:
+      tags:
+        - Comments
+      description: |
+        Remove a comment either on the authenticated user's media object or
+        authored by the authenticated user.
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: number
+              data:
+                type: object
 
-  StudioLog:
-    type: object
-    # TODO refector
-
-  Svg:
-    type: object
-    properties:
-      id:
+  /media/{media-id}/likes:
+    parameters:
+      - name: media-id
+        in: path
+        description: Media ID
         type: integer
-        example: 1
-      # svg_set_id:
-      #   type: integer
-      #   example: 1
-      svg_set:
-        $ref: '#/definitions/SvgSet'
-      name:
-        type: string
-        example: White Box
-        description: The name of the svg
-      svg_string:
-        type: string
-        format: svg
-      resize_factor:
-        type: integer
-        format: float
-        example: 0.1
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+        required: true
+    get:
+      tags:
+        - Likes
+        - Media
+      description: |
+        Get a list of users who have liked this media.
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: number
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Like'
+    post:
+      tags:
+        - Likes
+      description: Set a like on this media by the currently authenticated user.
+      security:
+        - oauth:
+            - comments
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: number
+              data:
+                type: object
+    delete:
+      tags:
+        - Likes
+      description: |
+        Remove a like on this media by the currently authenticated user.
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: number
+              data:
+                type: object
 
-  SvgSet:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      name:
-        type: string
-        example: Textboxes
-        description: The name of the svg set
-      # svg_set_type_id:
-      #   type: integer
-      #   example: 1
-      #   description: The id of the svg set type
-      svg_set_type:
-        $ref: '#/definitions/SvgSetType'
-      supports_interactive:
-        type: boolean
-        example: true
-        description: If the svg set is supported by interactive
-      import:
-        type: boolean
-        example: true
-        # TODO description
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  /tags/{tag-name}:
+    parameters:
+      - $ref: '#/parameters/tag-name'
+    get:
+      tags:
+        - Tags
+      description: Get information about a tag object.
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/Tag'
 
-  SvgSetType:
-    type: object
-    properties:
-      id:
-        type: integer
-        example: 1
-      name:
-        type: string
-        example: Icons
+  /tags/{tag-name}/media/recent:
+    parameters:
+      - $ref: '#/parameters/tag-name'
+    get:
+      tags:
+        - Tags
+      description: |
+        Get a list of recently tagged media. Use the `max_tag_id` and
+        `min_tag_id` parameters in the pagination response to paginate through
+        these objects.
+      responses:
+        200:
+          description: OK
+          schema:
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Tag'
 
+  /tags/search:
+    get:
+      tags:
+        - Tags
+      parameters:
+        - name: q
+          description: |
+            A valid tag name without a leading #. (eg. snowy, nofilter)
+          in: query
+          type: string
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              meta:
+                properties:
+                  code:
+                    type: integer
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Tag'
+
+  /locations/{location-id}:
+    parameters:
+      - name: location-id
+        description: Location ID
+        in: path
+        type: integer
+        required: true
+    get:
+      tags:
+        - Location
+      description: Get information about a location.
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/definitions/Location'
+
+  /locations/{location-id}/media/recent:
+    parameters:
+      - name: location-id
+        description: Location ID
+        in: path
+        type: integer
+        required: true
+    get:
+      tags:
+        - Location
+        - Media
+      description: Get a list of recent media objects from a given location.
+      parameters:
+        - name: max_timestamp
+          in: query
+          description: Return media before this UNIX timestamp.
+          type: integer
+        - name: min_timestamp
+          in: query
+          description: Return media after this UNIX timestamp.
+          type: integer
+        - name: min_id
+          in: query
+          description: Return media later than this min_id.
+          type: string
+        - name: max_id
+          in: query
+          description: Return media earlier than this max_id.
+          type: string
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Media'
+
+  /locations/search:
+    get:
+      tags:
+        - Location
+      description: Search for a location by geographic coordinate.
+      parameters:
+        - name: distance
+          in: query
+          description: Default is 1000m (distance=1000), max distance is 5000.
+          type: integer
+
+        - name: facebook_places_id
+          in: query
+          description: |
+            Returns a location mapped off of a Facebook places id. If used, a
+            Foursquare id and lat, lng are not required.
+          type: integer
+
+        - name: foursquare_id
+          in: query
+          description: |
+            returns a location mapped off of a foursquare v1 api location id.
+            If used, you are not required to use lat and lng. Note that this
+            method is deprecated; you should use the new foursquare IDs with V2
+            of their API.
+          type: integer
+
+        - name: lat
+          in: query
+          description: |
+            atitude of the center search coordinate. If used, lng is required.
+          type: number
+
+        - name: lng
+          in: query
+          description: |
+            ongitude of the center search coordinate. If used, lat is required.
+          type: number
+
+        - name: foursquare_v2_id
+          in: query
+          description: |
+            Returns a location mapped off of a foursquare v2 api location id. If
+            used, you are not required to use lat and lng.
+          type: integer
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Location'
+
+  /geographies/{geo-id}/media/recent:
+    parameters:
+      - name: geo-id
+        in: path
+        description: Geolocation ID
+        type: integer
+        required: true
+    get:
+      description: |
+        Get recent media from a geography subscription that you created.
+        **Note**: You can only access Geographies that were explicitly created
+        by your OAuth client. Check the Geography Subscriptions section of the
+        [real-time updates page](https://instagram.com/developer/realtime/).
+        When you create a subscription to some geography
+        that you define, you will be returned a unique geo-id that can be used
+        in this query. To backfill photos from the location covered by this
+        geography, use the [media search endpoint
+        ](https://instagram.com/developer/endpoints/media/).
+      parameters:
+        - name: count
+          in: query
+          description: Max number of media to return.
+          type: integer
+        - name: min_id
+          in: query
+          description: Return media before this `min_id`.
+          type: integer
+      responses:
+        200:
+          description: OK
+
+################################################################################
+#                                 Definitions                                  #
+################################################################################
+definitions:
   User:
     type: object
     properties:
       id:
         type: integer
-        example: 1
-      name:
+      username:
         type: string
-        description: Full Name
-        example: John Doe
-      email:
+      full_name:
         type: string
-        example: john.doe@example.com
-      phone:
+      profile_picture:
         type: string
-        example: +1 555 2368
-        description: 'Who you gonna call? https://nnmm.nl/?F7p'
-      profession:
+      bio:
         type: string
-        example: 'Editor'
-      organisation_id:
+      website:
+        type: string
+      counts:
+        type: object
+        properties:
+          media:
+            type: integer
+          follows:
+            type: integer
+          follwed_by:
+            type: integer
+  Media:
+    type: object
+    properties:
+      created_time:
+        description: Epoc time (ms)
         type: integer
-        example: 1
-      language:
-        $ref: '#/definitions/Language'
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
-
-  VectorLayer:
+      type:
+        type: string
+      filter:
+        type: string
+      tags:
+        type: array
+        items:
+          $ref: '#/definitions/Tag'
+      id:
+        type: integer
+      user:
+        $ref: '#/definitions/MiniProfile'
+      users_in_photo:
+        type: array
+        items:
+          $ref: '#/definitions/MiniProfile'
+      location:
+        $ref: '#/definitions/Location'
+      comments::
+        type: object
+        properties:
+          count:
+            type: integer
+          data:
+            type: array
+            items:
+              $ref: '#/definitions/Comment'
+      likes:
+        type: object
+        properties:
+          count:
+            type: integer
+          data:
+            type: array
+            items:
+              $ref: '#/definitions/MiniProfile'
+      images:
+        properties:
+          low_resolution:
+            $ref: '#/definitions/Image'
+          thumbnail:
+            $ref: '#/definitions/Image'
+          standard_resolution:
+            $ref: '#/definitions/Image'
+      videos:
+        properties:
+          low_resolution:
+            $ref: '#/definitions/Image'
+          standard_resolution:
+            $ref: '#/definitions/Image'
+  Location:
     type: object
     properties:
       id:
-        type: integer
-        example: 1
+        type: string
       name:
         type: string
-      path:
+      latitude:
+        type: number
+      longitude:
+        type: number
+  Comment:
+    type: object
+    properties:
+      id:
         type: string
-      bounding_box:
+      created_time:
         type: string
-      version:
+      text:
+        type: string
+      from:
+        $ref: '#/definitions/MiniProfile'
+  Like:
+    type: object
+    properties:
+      user_name:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      type:
+        type: string
+      id:
+        type: string
+  Tag:
+    type: object
+    properties:
+      media_count:
         type: integer
-        format: double
-      image:
+      name:
         type: string
-      scale_min:
-        minimum: 0
-        example: 0
-        description: The lowest scale that the vector layer can be used at. Must be smaller than scale_max.
-      scale_max:
-        minimum: 1
-        example: 16249
-        description: The highest scale that the vector layer can be used at. Must be greater than scale_min.
-      created_at:
-        $ref: '#/definitions/timestamp'
-      updated_at:
-        $ref: '#/definitions/timestamp'
+  Image:
+    type: object
+    properties:
+      width:
+        type: integer
+      height:
+        type: integer
+      url:
+        type: string
+  MiniProfile:
+    type: object
+    description: A shorter version of User for likes array
+    properties:
+      user_name:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: integer
+      profile_picture:
+        type: string
